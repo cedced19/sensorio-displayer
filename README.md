@@ -5,3 +5,11 @@ Before using the NodeMCU you can test the LiquidCrystal display with an Arduino 
 You can alse test the connection between your NodeMCU and the Senorio Hub with the `test-url` sketch
 
 ![Test Arduino](test-arduino.png)
+
+
+Than you can make this:
+![Schema](schema.png)
+
+The button connected on D1 is to toggle the light.
+The button connected on D2 is to show more informations.
+The button connected on D6 is to switch on the light for 5s.

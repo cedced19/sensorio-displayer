@@ -2,6 +2,10 @@
 #include <ESP8266HTTPClient.h>
 #include <ArduinoJson.h>
 
+// Buttons Parameters
+int buttonLightPin = 5;
+int buttonShortLightPin = 12;
+int buttonDetailPin = 4;
 
 // DHT Parameters
 #include "DHT.h"
@@ -22,6 +26,7 @@ const char* password = "WIFI_PWD";
 // Timers
 unsigned long timerExt = 0;
 unsigned long timerIn = 0;
+unsigned long timerSend = 0;
 
 float temperatureOut;
 float humidityOut;
@@ -83,12 +88,31 @@ void updateDataExt () {
       humidityOut = root["humidity"]; 
       lcd.setCursor(6, 0);
       lcd.print(temperatureOut);
-      
-      //showOutsideAndInside(temperatureOut, temperatureIn);
-      //showTempAndHumidity(temperatureOut, humidityOut);
     }
     http.end();
   }
+}
+
+void sendDataSensor (float temperature, float humidity) {
+    if (temperature > 0 && humidity > 0) {
+          float heatIndex = dht.computeHeatIndex(temperature, humidity, false);
+          char params[100];
+          char hB[10];
+          dtostrf(humidity, 4, 2, hB);
+          char tB[10];
+          dtostrf(temperature, 4, 2, tB);
+          
+          char hicB[10];
+          dtostrf(heatIndex, 4, 2, hicB);
+    
+          snprintf(params, 100, "humidity=%s&temperature=%s&heat_index=%s", hB, tB, hicB);
+          
+          HTTPClient http;
+          http.begin("http://example.com:8888/api/weather-data/");
+          http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+          http.POST(params);    
+          http.end();
+    }
 }
 
 void updateDataIn () {
@@ -97,10 +121,49 @@ void updateDataIn () {
       if (!isnan(tmpT) || !isnan(tmpH)) {
         temperatureIn = tmpT;
         humidityIn = tmpH;
-        float heatIndex = dht.computeHeatIndex(temperatureIn, humidityIn, false);
         lcd.setCursor(6, 1);
         lcd.print(temperatureIn);
       }
+}
+
+bool light = true;
+void toogleLight () {
+  if (light == true) {
+      lcd.noBacklight();
+  } else {
+      lcd.backlight();
+  }
+  light=!light;
+  delay(500);
+}
+
+
+void showDetail () {
+  if (light == false) {
+    lcd.backlight();
+    delay(2000);
+  }
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("   Exterieur");
+  lcd.setCursor(6, 0); 
+  lcd.write(0);
+  delay(1000);
+  showTempAndHumidity(temperatureOut, humidityOut);
+  delay(4000);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("   Interieur");
+  lcd.setCursor(6, 0); 
+  lcd.write(0);
+  delay(1000);
+  showTempAndHumidity(temperatureIn, humidityIn);
+  delay(4000);
+  showOutsideAndInside(temperatureOut, temperatureIn);
+  delay(3000);
+  if (light == false) {
+    lcd.noBacklight();
+  }
 }
 
 void setup() {
@@ -115,20 +178,23 @@ void setup() {
   lcd.print("  Chargement...");
   lcd.setCursor(0, 1);
   lcd.print("  Cedric JUNG");
+  lcd.setCursor(3, 1); 
+  lcd.write(0);
   // DHT11
   dht.begin();
+  // Button
+  pinMode(buttonLightPin, INPUT);
   // WiFi
   WiFi.begin(ssid, password);
   // Check for connection
   while (WiFi.status() != WL_CONNECTED) {
-    lcd.setCursor(0, 0);
-    lcd.print("  Connection...");
     delay(1000);
   }
   // Load data
   showOutsideAndInside(0,0);
   updateDataExt();
   updateDataIn();
+  Serial.begin(115200);
 }
 
 void loop() {
@@ -139,5 +205,22 @@ void loop() {
    if(millis() > timerIn + 60000){
         timerIn = millis();
         updateDataIn();
+   }
+   if(millis() > timerSend + 600000) {
+         timerSend = millis();
+         sendDataSensor(temperatureIn, humidityIn);
+   }
+   if (digitalRead(buttonLightPin) == HIGH) {
+         toogleLight();
+   }
+   if (digitalRead(buttonShortLightPin) == HIGH) {
+         if (light == false) {
+            lcd.backlight();
+            delay(5000);
+            lcd.noBacklight();
+         }
+   }
+   if (digitalRead(buttonDetailPin) == HIGH) {
+         showDetail();
    }
 }
