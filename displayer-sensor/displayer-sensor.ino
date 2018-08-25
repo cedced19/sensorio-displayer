@@ -190,10 +190,12 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
   }
+  WiFi.mode(WIFI_STA);
   // Load data
   showOutsideAndInside(0,0);
   updateDataExt();
   updateDataIn();
+  lcd.noBacklight();
   Serial.begin(115200);
 }
 
